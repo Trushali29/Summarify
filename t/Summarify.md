@@ -126,10 +126,10 @@ Politics domain with 417 articles and summaries.
 
 **4.3 Process flow diagram**
 
-![image](https://github.com/Trushali29/Summarify/assets/84562990/4562f726-14d3-41a7-911d-fa00b1919125)
+			![image](https://github.com/Trushali29/Summarify/assets/84562990/4562f726-14d3-41a7-911d-fa00b1919125)
 
 
-						**Figure 1: The process flow diagram of text summary generation.**
+						**Figure-1 The process flow diagram of text summary generation**
 
 
 **4.3.1 Pre-processing**
@@ -171,8 +171,11 @@ All of the graphs below shows the comparison of  TF-IDF, GloVe Embedding and Tex
 These F1 scores are calculate using average of all F1 scores computed from 5 domain.
 Figure 2 shows the F1 score of each method. It tells that GloVe works better than TF-IDF and TextRank in generating summaries for articles. 
 
+
+			![image](https://github.com/Trushali29/Summarify/assets/84562990/d8da068d-14f0-41f2-835e-628388e377e0)
+
  
-Figure 2: Average F1 Score of different algorithms.
+					**Figure 2: Average F1 Score of different algorithms.**
 
 
 
@@ -182,26 +185,35 @@ Figure 2: Average F1 Score of different algorithms.
 
 
 In figure 3, the average F1 score is calculated for each method on each domain. The graph concludes that GloVe performs best on every domain except Tech.TF-IDF works better on Tech domain.
- 
-Figure 3: Comparison of methods on 5 domains.
+
+				
+    				![image](https://github.com/Trushali29/Summarify/assets/84562990/4a29d0d5-9548-4149-b4c9-e7153f280ece)
+
+						**Figure 3: Comparison of methods on 5 domains.**
+
 
 Use of POS tags  ( parts of speech tags ) as a feature extraction is done to get better results on summarization of  articles. Since, it is stated that sentences containing proper nouns and pronouns have greater chances to be included in the summary by [1], all of the methods are evaluated using parts of speech tags. Figure 4 concludes that TextRank achieve better F1 score than TF-IDF and GloVe. 
- 
-Figure 4: F1 Score of algorithms using POS tags.
 
-
-
+				![image](https://github.com/Trushali29/Summarify/assets/84562990/b09e7b99-0579-4fd7-8137-9ce9a79001ce)
+    
+				**Figure 4: F1 Score of algorithms using POS tags.**
 
 
 Based on figure 5 results it is concluded that if we apply POS tags with TextRank it works better on every domain generating better summaries than other two methods.
 
- 
-Figure 5: Comparison of methods on 5 domains using POS tags in pre-processing.
+ 				
+     ![image](https://github.com/Trushali29/Summarify/assets/84562990/82959b10-ed33-4ab8-8485-d66a8f7c4a21)
+
+					**Figure 5: Comparison of methods on 5 domains using POS tags in pre-processing.**
+
 
 Using F1 score of every 5 domain of figure 3 and figure 5 an average score of each algorithm is calculated based on with and without POS tags values. The results are shown in figure 6 where TextRank accuracy is improved while Glove remains somewhat same. Also TF-IDF provides a slight improvement in its score. This graph helps to conclude that TextRank generated summaries can be improve with POS tags to achieve better performance while GloVe and TF-IDF algorithm can be kept same. 
 
+
+				![image](https://github.com/Trushali29/Summarify/assets/84562990/392722c0-0a18-481e-9a03-09305d507b33)
+
  
-Figure 6: Comparison of algorithms from their previous performance with and without POS tags.
+				**Figure 6: Comparison of algorithms from their previous performance with and without POS tags.**
 
 
 6.1 Code
