@@ -351,6 +351,7 @@ India's rupee has hit a five-year high after Standard & Poor's (S&P) raised the 
 
 
 **Table 5: Politics Article**
+
 **Article**
 Tsunami debt deal to be announced
 
