@@ -129,7 +129,7 @@ Politics domain with 417 articles and summaries.
 			![image](https://github.com/Trushali29/Summarify/assets/84562990/4562f726-14d3-41a7-911d-fa00b1919125)
 
 
-						**Figure-1 The process flow diagram of text summary generation**
+                                          Figure-1 The process flow diagram of text summary generation
 
 
 **4.3.1 Pre-processing**
