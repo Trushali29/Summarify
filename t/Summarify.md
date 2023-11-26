@@ -207,407 +207,178 @@ Using F1 score of every 5 domain of figure 3 and figure 5 an average score of ea
 Figure 6: Comparison of algorithms from their previous performance with and without POS tags.
 
 
-6.1 Code
+**6.1 GUI Output**
 
-6.1.1 TF_IDF Method
 
-import numpy as np
-import pandas as pd
-from operator import itemgetter
-import pre_processing as pp
-import nltk
-from nltk.tokenize import sent_tokenize, word_tokenize
-import matplotlib.pyplot as plt
-class TF_IDF :
-    def __init__(self,all_documents):
-        self.all_documents = all_documents
-        self.TermFreq = {}
-        self.InvertedDocFreq = {}     
-    def TermFrequency(self):
-      for document in self.all_documents:
-        words = document.split()
-        for word in words:
-          tf = round(words.count(word)/len(words),4)
-          self.TermFreq[word] = tf
-      return self.TermFreq
-    def InvertedDocumentFrequency(self):
-      for document in self.all_documents:
-        for term in document.split():
-          num_docs_with_term = sum(1 for doc in self.all_documents if term in doc)
-          idf = np.log(len(self.all_documents) / num_docs_with_term)
-          self.InvertedDocFreq[term] = idf
-      return self.InvertedDocFreq
-    def result_tf_idf(self): 
-      get_tf_idf = {}
-      terms_all_docs = list(set(w for sent in self.all_documents for w in sent.split()))
-      number_of_documents = len(self.all_documents)
-      # get tf_idf values of all terms
-      for term in terms_all_docs:
-        get_tf_idf[term] = round(self.TermFreq[term] * self.InvertedDocFreq[term],4)
-      # create a dataframe for tf-idf matrix 
-      tf_idf_table = pd.DataFrame(columns = terms_all_docs,index = np.arange(number_of_documents))
-      # add values in the dataframe
-      for document in self.all_documents:
-        for term in tf_idf_table:
-          if (term in document):
-            tf_idf_table.loc[self.all_documents.index(document)][term] = get_tf_idf[term] 
-          else:
-            tf_idf_table.loc[self.all_documents.index(document)][term] = 0
-      return tf_idf_table
-def sentence_scoring(article,tf_idf_table):
-  sentences = sent_tokenize(article)
-  filtered_sentences = []
-  for sentence in sentences:
-    res = " ".join(pp.preprocessing(sentence))
-    filtered_sentences.append(res)
-  # calculate the scores for each sentences of the text
-  sentences_scores = {}  # Dictionary to store sentence scores
-  for sentence_idx in range(len(filtered_sentences)):
-    words = word_tokenize(filtered_sentences[sentence_idx]) # sentence word tokens
-    # Calculate the sentence score using TF-IDF values
-    sentence_score = 0
-    for word in words:
-      if word in tf_idf_table.columns:  # Check if the word exists in TF-IDF columns
-        sentence_score += tf_idf_table.loc[0][word]
-    sentences_scores[sentence_idx] = round(sentence_score,4)
-  # selecting the top sentences as a summary
-  #sentence_in_summary = int((/100)*len(sentences))
-  res = dict(sorted(sentences_scores.items(), key=itemgetter(1), reverse=True)[:5]) # get top 5 keys having high values
-  res = dict(sorted(res.items()))# sorting the keys in sequence
-  summary = ''
-  for keys in res:
-    summary += ' '+ sentences[keys]
-  return summary
-def get_input_text(article):
-    clean_text = pp.preprocessing(article)
-    # Calculate TF-IDF
-    t1 = TF_IDF(clean_text)
-    term_freq = t1.TermFrequency()
-    inverted_doc_freq = t1.InvertedDocumentFrequency()
-    tf_idf = t1.result_tf_idf()
-    summary = sentence_scoring(article,tf_idf)
-    return summary
+![image](https://github.com/Trushali29/Summarify/assets/84562990/7cf0e85d-af51-402e-8a07-c338969b8130)
 
-6.1.2 GloVe Method
-
-from sklearn.metrics.pairwise import cosine_similarity
-import numpy as np
-import pandas as pd
-import nltk
-from nltk.tokenize import sent_tokenize, word_tokenize
-import pre_processing as pp
-from nltk import pos_tag
-# Load the pre-trained GloVe embeddings
-def load_glove_embeddings(file_path):
-    word_embeddings = {}
-    with open(file_path, encoding='utf-8') as f:
-        for line in f:
-            values = line.split()
-            word = values[0]
-            embedding = np.asarray(values[1:], dtype='float32')
-            word_embeddings[word] = embedding
-    return word_embeddings
-# Load pre-trained GloVe embeddings (adjust path accordingly)
-glove_embeddings = load_glove_embeddings('glove6/glove.6B.300d.txt')
-# Calculate sentence embedding using average of word embeddings
-def calculate_sentence_embedding(sentence, word_embeddings):
-    words = sentence.split()
-    sentence_embedding = np.mean([word_embeddings.get(word, np.zeros(word_embeddings['a'].shape)) for word in words], axis=0)
-    return sentence_embedding
-def get_input_text2(article):
-    first_sent_idx = 0
-    clean_text = pp.preprocessing(article)
-    sentence_embeddings = []
-    for sentence in clean_text:
-        sent_embedding = calculate_sentence_embedding(sentence,glove_embeddings)
-        sentence_embeddings.append(sent_embedding)
-    similarity_matrix = cosine_similarity(sentence_embeddings)
-    num_summary_sentences = 5
-    summary_indices = np.argsort(np.sum(similarity_matrix,axis = 1))[-num_summary_sentences:]
-    summary_indices = sorted(summary_indices)
-    original_text = sent_tokenize(article)
-    summary_sentences = [ original_text[idx] for idx in summary_indices]
-    summary_res = "\n".join(summary_sentences)
-    return summary_res
-
-6.1.3 TextRank Method
-
-import numpy as np
-import pandas as pd
-import re
-import nltk
-from nltk.tokenize import sent_tokenize, word_tokenize
-from nltk.corpus import stopwords
-import warnings
-import contractions
-import pre_processing as pp
-# Preprocess the text
-stop_words = set(stopwords.words('english'))
-# Create a graph using the TextRank algorithm
-def create_graph(sentences):
-    words_list = [pp.pos_tagging(" ".join(pp.preprocessing(sentence))) for sentence in sentences]
-    words = set(word for words in words_list for word in words)
-    word2id = {word: i for i, word in enumerate(words)}
-    id2word = {i: word for word, i in word2id.items()}
-
-    # Create a matrix where each row represents a sentence and each column represents a word
-    matrix = np.zeros((len(sentences), len(words)))
-    for i, words in enumerate(words_list):
-        for word in words:
-            matrix[i][word2id[word]] += 1
-    # Calculate sentence similarity using cosine similarity
-    similarity_matrix = np.dot(matrix, matrix.T)
-    norm_matrix = np.outer(np.linalg.norm(matrix, axis=1), np.linalg.norm(matrix, axis=1))
-    similarity_matrix = similarity_matrix / norm_matrix
-    # Apply the PageRank algorithm to rank sentences
-    damping_factor = 0.85
-    scores = np.ones(len(sentences))
-    for _ in range(100):  # Number of iterations
-        scores = (1 - damping_factor) + damping_factor * np.dot(similarity_matrix, scores)
-    return scores
-# Get the top N sentences as the summary
-def get_summary(sentences, scores, top_n = 5):
-    ranked_sentences = [(sentence, score) for sentence, score in zip(sentences, scores)]
-    ranked_sentences.sort(key=lambda x: x[1], reverse=True)
-    summary_sentences = ranked_sentences[:top_n]
-    summary = [sentence for sentence, _ in summary_sentences]
-    return " ".join(summary)
-def get_input_text3(article):
-    sentences = nltk.sent_tokenize(article)
-    # Generate the summary
-    scores = create_graph(sentences)
-    predict_summary = get_summary(sentences, scores)
-    return predict_summary
-6.1.4 Main file
-
-import customtkinter
-from customtkinter import StringVar, IntVar
-from PIL import Image,ImageTk
-from tkinter import filedialog
-import tkinter 
-from CTkMessagebox import CTkMessagebox
-from nltk import sent_tokenize
-import Method_1_TF_IDF as tf_idf
-import Method_2_Glove as glove
-import Method_3_TextRank as textrank
-import pre_processing as pp
-import model_evaluation as check_acc
-import os
-title = ''
-article = ''
-summary = ''
-category = ''
-article_filename = ''
-res_summry = ''
-customtkinter.set_appearance_mode("Light")  # Modes: "System" (standard), "Dark", "Light"
-customtkinter.set_default_color_theme("green")  # Themes: "blue" (standard), "green", "dark-blue"
-master = customtkinter.CTk() # customtkinter
-master.geometry("1440x780")
-master.title("Text Summarization")
-master.resizable(False,False)
-# Input File frame
-input_text = customtkinter.CTkTextbox(master,font=('arial',15),width = 650 ,height = 400)
-input_text.grid(row=7,column=7,columnspan=3,padx=48,pady=30)
-# Input File frame
-output_summary = customtkinter.CTkTextbox(master,font=('arial',15),width = 650 ,height = 400)
-output_summary.grid(row=7,column=10)
-score_btn = customtkinter.CTkButton(master, text = '00.0%',font = ('arial',13),width = 35,height = 45,corner_radius = 22,bg_color = "#F8F8F8")
-score_btn.place(relx=0.56, rely=0.51, anchor=tkinter.CENTER)
-def download_summary():    
-    res_summary = output_summary.get("0.0", "end")
-    filename_path = "D:\\Research Papers\\TextSummary\\BBC News Summary\\GeneratedSummaries" + "\\" + category + "\\" + article_filename 
-    file = open(filename_path,"w+")
-    file.write(res_summary)
-    file.close()
-img = tkinter.PhotoImage(file="download.png")
-download_btn = customtkinter.CTkButton(master, text = "", image = img,width = 4,height = 4,corner_radius = 5,bg_color = "#F8F8F8",fg_color = "#F8F8F8",
-                                       hover_color = "#F8F8F8",command = download_summary)
-download_btn.place(relx=0.94, rely=0.51, anchor=tkinter.CENTER)
-# Function to open a file and populate text_box_A
-def open_file():    
-    global category
-    global article_filename
-    file_path = filedialog.askopenfilename(filetypes=[("Text files", "*.txt")])
-    summary_path = file_path.split('/')
-    category = summary_path[-2].strip()
-    article_filename = summary_path[-1].strip()
-    summary_path[4] = 'Summaries'
-    summary_path = "/".join(summary_path)
-    global title
-    global article
-    global summary
-    if file_path:
-        with open(file_path, "r") as file:
-            title = next(file) # title of the doc
-            article = file.read()
-            input_text.delete("1.0", customtkinter.END)
-            input_text.insert(customtkinter.END, article)
-    if summary_path:
-        with open(summary_path,"r") as file2:
-            summary = file2.read()
-# GET SUMMARIES OF HIGEST F1 SOCRE
-def get_summaries():    
-    tf_idf_summary = tf_idf.get_input_text(article)
-    tf_idf_acc = check_acc.calculate_f1_score(tf_idf_summary,summary)
-    glove_summary = glove.get_input_text2(article)
-    glove_acc = check_acc.calculate_f1_score(glove_summary,summary)      
-    textrank_summary = textrank.get_input_text3(article)
-    textrank_acc = check_acc.calculate_f1_score(textrank_summary,summary)
-    if((tf_idf_acc > glove_acc ) and (tf_idf_acc > textrank_acc)):        
-        output_summary.delete("1.0", customtkinter.END)
-        output_summary.insert(customtkinter.END,tf_idf_summary)
-        score_btn.configure(text = str(tf_idf_acc)+"%")
-        
-    elif((glove_acc > tf_idf_acc) and (glove_acc > textrank_acc)):
-        output_summary.delete("1.0", customtkinter.END)
-        output_summary.insert(customtkinter.END,glove_summary)
-        score_btn.configure(text = str(glove_acc)+"%")        
-    elif((textrank_acc > tf_idf_acc ) and (textrank_acc > glove_acc )):
-        output_summary.delete("1.0", customtkinter.END)
-        output_summary.insert(customtkinter.END,textrank_summary)
-        score_btn.configure(text = str(textrank_acc)+"%")
-    else:     
-        output_summary.delete("1.0", customtkinter.END)
-        output_summary.insert(customtkinter.END,tf_idf_summary) # default summary method to show
-        score_btn.configure(text = str(tf_idf_acc)+"%")
-       print("Accurcay tf_idf_result {} \n glove_result {} \n textrank_result {} ".format(tf_idf_acc,glove_acc,textrank_acc))
-radio_var = tkinter.IntVar(value=0)
-# GET SUMMARIES BASED ON THE METHOD SELETEC
-def Get_Method():
-    if (radio_var.get() == 1):    
-        tf_idf_summary = tf_idf.get_input_text(article)
-        tf_idf_acc = check_acc.calculate_f1_score(tf_idf_summary,summary)
-        output_summary.delete("1.0", customtkinter.END)
-        output_summary.insert(customtkinter.END,tf_idf_summary)
-        score_btn.configure(text = str(tf_idf_acc)+"%") 
-    elif(radio_var.get() == 2):
-        glove_summary = glove.get_input_text2(article)
-        glove_acc = check_acc.calculate_f1_score(glove_summary,summary)
-        output_summary.delete("1.0", customtkinter.END)
-        output_summary.insert(customtkinter.END,glove_summary)
-        score_btn.configure(text = str(glove_acc)+"%")      
-    elif(radio_var.get() == 3):
-        textrank_summary = textrank.get_input_text3(article)
-        textrank_acc = check_acc.calculate_f1_score(textrank_summary,summary)
-        output_summary.delete("1.0", customtkinter.END)
-        output_summary.insert(customtkinter.END,textrank_summary)
-        score_btn.configure(text = str(textrank_acc)+"%")     
-    else:
-        output_summary.delete("1.0", customtkinter.END)
-        output_summary.insert(customtkinter.END,"No summaries")
-        score = '0'
-# Use CTkButton instead of tkinter Button
-upload_btn = customtkinter.CTkButton(master, text="Upload File",font = ('arial',15),width = 40,height = 40, command = open_file)
-upload_btn.grid(row = 10, column = 8,pady = 10)
-summary_btn = customtkinter.CTkButton(master, text="Get Summary",font = ('arial',15),width = 40,height = 40,command = get_summaries)
-summary_btn.grid(row = 10, column = 10)
-label_radio_group = customtkinter.CTkLabel(master, text="Select Summary Method")
-label_radio_group.place(relx=0.1, rely=0.7)
-radio_button_1 = customtkinter.CTkRadioButton(master, variable=radio_var, value = 1,text = "TF-IDF",command = Get_Method)
-radio_button_1.place(relx=0.3, rely=0.7)
-radio_button_2 = customtkinter.CTkRadioButton(master, variable=radio_var, value = 2,text = "Glove",command = Get_Method)
-radio_button_2.place(relx=0.4, rely=0.7)
-radio_button_3 = customtkinter.CTkRadioButton(master, variable=radio_var, value = 3,text = "TextRank",command = Get_Method)
-radio_button_3.place(relx=0.5, rely=0.7)
-master.mainloop()
-6.2 GUI Output
-
- 
 Figure 7: GUI of Text Summary 
- 
+
+
+ ![image](https://github.com/Trushali29/Summarify/assets/84562990/be826054-f2c7-4262-8c99-20f4bb361659)
+
 Figure 8: Upload an Article File
- 
+
+
+ ![image](https://github.com/Trushali29/Summarify/assets/84562990/79153c4d-cf1b-4245-8f96-b81346626022)
+
 Figure 9: Get Summary of the Article
- 
+
+
+ ![image](https://github.com/Trushali29/Summarify/assets/84562990/cfef6ab2-fe90-47bc-83ef-287e2cf09f3e)
+
 Figure 10: Download summary of the Article
 
 
 
-
-
-
-6.3 Summary of articles for each domain 
+**6.2 Summary of articles for each domain** 
  
-Table 1: Entertainment Article
-Article	A Christmas tree that can receive text messages has been unveiled at London's Tate Britain art gallery.
+**Table 1: Entertainment Article**
+**Article**
+A Christmas tree that can receive text messages has been unveiled at London's Tate Britain art gallery.
  The spruce has an antenna which can receive Bluetooth texts sent by visitors to the Tate. The messages will be "unwrapped" by sculptor Richard Wentworth, who is responsible for decorating the tree with broken plates and light bulbs. It is the 17th year that the gallery has invited an artist to dress their Christmas tree. Artists who have decorated the Tate tree in previous years include Tracey Emin in 2002.
  
- The plain green Norway spruce is displayed in the gallery's foyer. Its light bulb adornments are dimmed, ordinary domestic ones joined together with string. The plates decorating the branches will be auctioned off for the children's charity ArtWorks. Wentworth worked as an assistant to sculptor Henry Moore in the late 1960s. His reputation as a sculptor grew in the 1980s, while he has been one of the most influential teachers during the last two decades. Wentworth is also known for his photography of mundane, everyday subjects such as a cigarette packet jammed under the wonky leg of a table.
-Original Summary	The messages will be "unwrapped" by sculptor Richard Wentworth, who is responsible for decorating the tree with broken plates and light bulbs. A Christmas tree that can receive text messages has been unveiled at London's Tate Britain art gallery. It is the 17th year that the gallery has invited an artist to dress their Christmas tree. The spruce has an antenna which can receive Bluetooth texts sent by visitors to the Tate. His reputation as a sculptor grew in the 1980s, while he has been one of the most influential teachers during the last two decades.
-TF_IDF Summary	A Christmas tree that can receive text messages has been unveiled at London's Tate Britain art gallery. The spruce has an antenna which can receive Bluetooth texts sent by visitors to the Tate. The messages will be "unwrapped" by sculptor Richard Wentworth, who is responsible for decorating the tree with broken plates and light bulbs. It is the 17th year that the gallery has invited an artist to dress their Christmas tree. Artists who have decorated the Tate tree in previous years include Tracey Emin in 2002.
-GloVe Summary	A Christmas tree that can receive text messages has been unveiled at London's Tate Britain art gallery.
+The plain green Norway spruce is displayed in the gallery's foyer. Its light bulb adornments are dimmed, ordinary domestic ones joined together with string. The plates decorating the branches will be auctioned off for the children's charity ArtWorks. Wentworth worked as an assistant to sculptor Henry Moore in the late 1960s. His reputation as a sculptor grew in the 1980s, while he has been one of the most influential teachers during the last two decades. Wentworth is also known for his photography of mundane, everyday subjects such as a cigarette packet jammed under the wonky leg of a table.
+
+**Original Summary**
+The messages will be "unwrapped" by sculptor Richard Wentworth, who is responsible for decorating the tree with broken plates and light bulbs. A Christmas tree that can receive text messages has been unveiled at London's Tate Britain art gallery. It is the 17th year that the gallery has invited an artist to dress their Christmas tree. The spruce has an antenna which can receive Bluetooth texts sent by visitors to the Tate. His reputation as a sculptor grew in the 1980s, while he has been one of the most influential teachers during the last two decades.
+
+**TF_IDF Summary**
+A Christmas tree that can receive text messages has been unveiled at London's Tate Britain art gallery. The spruce has an antenna which can receive Bluetooth texts sent by visitors to the Tate. The messages will be "unwrapped" by sculptor Richard Wentworth, who is responsible for decorating the tree with broken plates and light bulbs. It is the 17th year that the gallery has invited an artist to dress their Christmas tree. Artists who have decorated the Tate tree in previous years include Tracey Emin in 2002.
+
+**GloVe Summary**
+A Christmas tree that can receive text messages has been unveiled at London's Tate Britain art gallery.
 The messages will be "unwrapped" by sculptor Richard Wentworth, who is responsible for decorating the tree with broken plates and light bulbs.
 It is the 17th year that the gallery has invited an artist to dress their Christmas tree.
 Artists who have decorated the Tate tree in previous years include Tracey Emin in 2002.
 His reputation as a sculptor grew in the 1980s, while he has been one of the most influential teachers during the last two decades.
-Text Rank Summary	A Christmas tree that can receive text messages has been unveiled at London's Tate Britain art gallery. The spruce has an antenna which can receive Bluetooth texts sent by visitors to the Tate. The messages will be "unwrapped" by sculptor Richard Wentworth, who is responsible for decorating the tree with broken plates and light bulbs. It is the 17th year that the gallery has invited an artist to dress their Christmas tree. Artists who have decorated the Tate tree in previous years include Tracey Emin in 2002.
 
-Table 2: Sport Article
-Article	British hurdler Sarah Claxton is confident she can win her first major medal at next month's European Indoor Championships in Madrid.
- The 25-year-old has already smashed the British record over 60m hurdles twice this season, setting a new mark of 7.96 seconds to win the AAAs title. "I am quite confident," said Claxton. "But I take each race as it comes. "As long as I keep up my training but not do too much, I think there is a chance of a medal." Claxton has won the national 60m hurdles title for the past three years but has struggled to translate her domestic success to the international stage. Now, the Scotland-born athlete owns the equal fifth-fastest time in the world this year. And at last week's Birmingham Grand Prix, Claxton left European medal favourite Russian Irina Shevchenko trailing in sixth spot.
+**Text Rank Summary**
+A Christmas tree that can receive text messages has been unveiled at London's Tate Britain art gallery. The spruce has an antenna which can receive Bluetooth texts sent by visitors to the Tate. The messages will be "unwrapped" by sculptor Richard Wentworth, who is responsible for decorating the tree with broken plates and light bulbs. It is the 17th year that the gallery has invited an artist to dress their Christmas tree. Artists who have decorated the Tate tree in previous years include Tracey Emin in 2002.
+
+
+**Table 2: Sport Article**
+
+**Article**
+British hurdler Sarah Claxton is confident she can win her first major medal at next month's European Indoor Championships in Madrid.
+The 25-year-old has already smashed the British record over 60m hurdles twice this season, setting a new mark of 7.96 seconds to win the AAAs title. "I am quite confident," said Claxton. "But I take each race as it comes. "As long as I keep up my training but not do too much, I think there is a chance of a medal." Claxton has won the national 60m hurdles title for the past three years but has struggled to translate her domestic success to the international stage. Now, the Scotland-born athlete owns the equal fifth-fastest time in the world this year. And at last week's Birmingham Grand Prix, Claxton left European medal favourite Russian Irina Shevchenko trailing in sixth spot.
  For the first time, Claxton has only been preparing for a campaign over the hurdles - which could explain her leap in form. In previous seasons, the 25-year-old also contested the long jump but since moving from Colchester to London she has re-focused her attentions. Claxton will see if her new training regime pays dividends at the European Indoors which take place on 5-6 March.
-Original Summary	For the first time, Claxton has only been preparing for a campaign over the hurdles - which could explain her leap in form .Claxton has won the national 60m hurdles title for the past three years but has struggled to translate her domestic success to the international stage. British hurdler Sarah Claxton is confident she can win her first major medal at next month's European Indoor Championships in Madrid. Claxton will see if her new training regime pays dividends at the European Indoors which take place on 5-6 March. "I am quite confident," said Claxton.
-TF_IDF Summary	British hurdler Sarah Claxton is confident she can win her first major medal at next month's European Indoor Championships in Madrid. "I am quite confident," said Claxton. And at last week's Birmingham Grand Prix, Claxton left European medal favourite Russian Irina Shevchenko trailing in sixth spot. For the first time, Claxton has only been preparing for a campaign over the hurdles - which could explain her leap in form. Claxton will see if her new training regime pays dividends at the European Indoors which take place on 5-6 March.
-GloVe Summary	British hurdler Sarah Claxton is confident she can win her first major medal at next month's European Indoor Championships in Madrid.
+
+ 
+**Original Summary**
+
+For the first time, Claxton has only been preparing for a campaign over the hurdles - which could explain her leap in form .Claxton has won the national 60m hurdles title for the past three years but has struggled to translate her domestic success to the international stage. British hurdler Sarah Claxton is confident she can win her first major medal at next month's European Indoor Championships in Madrid. Claxton will see if her new training regime pays dividends at the European Indoors which take place on 5-6 March. "I am quite confident," said Claxton.
+
+**TF_IDF Summary**
+
+British hurdler Sarah Claxton is confident she can win her first major medal at next month's European Indoor Championships in Madrid. "I am quite confident," said Claxton. And at last week's Birmingham Grand Prix, Claxton left European medal favourite Russian Irina Shevchenko trailing in sixth spot. For the first time, Claxton has only been preparing for a campaign over the hurdles - which could explain her leap in form. Claxton will see if her new training regime pays dividends at the European Indoors which take place on 5-6 March.
+
+**GloVe Summary**
+
+British hurdler Sarah Claxton is confident she can win her first major medal at next month's European Indoor Championships in Madrid.
 Claxton has won the national 60m hurdles title for the past three years but has struggled to translate her domestic success to the international stage.
 Now, the Scotland-born athlete owns the equal fifth-fastest time in the world this year.
 For the first time, Claxton has only been preparing for a campaign over the hurdles - which could explain her leap in form.
 Claxton will see if her new training regime pays dividends at the European Indoors which take place on 5-6 March.
-Text Rank Summary	British hurdler Sarah Claxton is confident she can win her first major medal at next month's European Indoor Championships in Madrid. The 25-year-old has already smashed the British record over 60m hurdles twice this season, setting a new mark of 7.96 seconds to win the AAAs title. "I am quite confident," said Claxton. "But I take each race as it comes. "As long as I keep up my training but not do too much, I think there is a chance of a medal."
+
+
+**Text Rank Summary**
+
+British hurdler Sarah Claxton is confident she can win her first major medal at next month's European Indoor Championships in Madrid. The 25-year-old has already smashed the British record over 60m hurdles twice this season, setting a new mark of 7.96 seconds to win the AAAs title. "I am quite confident," said Claxton. "But I take each race as it comes. "As long as I keep up my training but not do too much, I think there is a chance of a medal."
 
 
 
-Table 3: Tech Article
-Article	US gamers will be able to buy Sony's PlayStation Portable from 24 March, but there is no news of a Europe debut.
+**Table 3: Tech Article**
+**Article**
+US gamers will be able to buy Sony's PlayStation Portable from 24 March, but there is no news of a Europe debut.
 
 The handheld console will go on sale for $250 (Â£132) and the first million sold will come with Spider-Man 2 on UMD, the disc format for the machine. Sony has billed the machine as the Walkman of the 21st Century and has sold more than 800,000 units in Japan. The console (12cm by 7.4cm) will play games, movies and music and also offers support for wireless gaming. Sony is entering a market which has been dominated by Nintendo for many years.
 
 It launched its DS handheld in Japan and the US last year and has sold 2.8 million units. Sony has said it wanted to launch the PSP in Europe at roughly the same time as the US, but gamers will now fear that the launch has been put back. Nintendo has said it will release the DS in Europe from 11 March. "It has gaming at its core, but it's not a gaming device. It's an entertainment device," said Kaz Hirai, president of Sony Computer Entertainment America.
-Original Summary	Sony has billed the machine as the Walkman of the 21st Century and has sold more than 800,000 units in Japan.Sony has said it wanted to launch the PSP in Europe at roughly the same time as the US, but gamers will now fear that the launch has been put back.Nintendo has said it will release the DS in Europe from 11 March.It launched its DS handheld in Japan and the US last year and has sold 2.8 million units.
-TF_IDF Summary	US gamers will be able to buy Sony's PlayStation Portable from 24 March, but there is no news of a Europe debut. The console (12cm by 7.4cm) will play games, movies and music and also offers support for wireless gaming. Sony has said it wanted to launch the PSP in Europe at roughly the same time as the US, but gamers will now fear that the launch has been put back. Nintendo has said it will release the DS in Europe from 11 March. "It has gaming at its core, but it's not a gaming device.
-GloVe Summary	US gamers will be able to buy Sony's PlayStation Portable from 24 March, but there is no news of a Europe debut.
+
+**Original Summary**
+
+Sony has billed the machine as the Walkman of the 21st Century and has sold more than 800,000 units in Japan.Sony has said it wanted to launch the PSP in Europe at roughly the same time as the US, but gamers will now fear that the launch has been put back.Nintendo has said it will release the DS in Europe from 11 March.It launched its DS handheld in Japan and the US last year and has sold 2.8 million units.
+
+**TF_IDF Summary**
+
+US gamers will be able to buy Sony's PlayStation Portable from 24 March, but there is no news of a Europe debut. The console (12cm by 7.4cm) will play games, movies and music and also offers support for wireless gaming. Sony has said it wanted to launch the PSP in Europe at roughly the same time as the US, but gamers will now fear that the launch has been put back. Nintendo has said it will release the DS in Europe from 11 March. "It has gaming at its core, but it's not a gaming device.
+
+**GloVe Summary**
+
+US gamers will be able to buy Sony's PlayStation Portable from 24 March, but there is no news of a Europe debut.
 The handheld console will go on sale for $250 (Â£132) and the first million sold will come with Spider-Man 2 on UMD, the disc format for the machine.
 The console (12cm by 7.4cm) will play games, movies and music and also offers support for wireless gaming.
 It launched its DS handheld in Japan and the US last year and has sold 2.8 million units.
 Sony has said it wanted to launch the PSP in Europe at roughly the same time as the US, but gamers will now fear that the launch has been put back.
-Text Rank Summary	It launched its DS handheld in Japan and the US last year and has sold 2.8 million units. Nintendo has said it will release the DS in Europe from 11 March. Sony has billed the machine as the Walkman of the 21st Century and has sold more than 800,000 units in Japan. Sony has said it wanted to launch the PSP in Europe at roughly the same time as the US, but gamers will now fear that the launch has been put back. The handheld console will go on sale for $250 (Â£132) and the first million sold will come with Spider-Man 2 on UMD, the disc format for the machine.
+
+**Text Rank Summary**
+
+It launched its DS handheld in Japan and the US last year and has sold 2.8 million units. Nintendo has said it will release the DS in Europe from 11 March. Sony has billed the machine as the Walkman of the 21st Century and has sold more than 800,000 units in Japan. Sony has said it wanted to launch the PSP in Europe at roughly the same time as the US, but gamers will now fear that the launch has been put back. The handheld console will go on sale for $250 (Â£132) and the first million sold will come with Spider-Man 2 on UMD, the disc format for the machine.
 
 
 
 
-Table 4: Business Article
-Article	India's rupee has hit a five-year high after Standard & Poor's (S&P) raised the country's foreign currency rating.
+**Table 4: Business Article**
+**Article**
+
+India's rupee has hit a five-year high after Standard & Poor's (S&P) raised the country's foreign currency rating.
 
 The rupee climbed to 43.305 per US dollar on Thursday, up from a close of 43.41. The currency has gained almost 1% in the past three sessions. S&P, which rates borrowers' creditworthiness, lifted India's rating by one notch to 'BB+'. With Indian assets now seen as less of a gamble, more cash is expected to flow into its markets, buoying the rupee.
 
 "The upgrade is positive and basically people will use it as an excuse to come back to India," said Bhanu Baweja, a strategist at UBS. "Money has moved out from India in the first two or three weeks of January into other markets like Korea and Thailand and this upgrade should lead to a reversal." India's foreign currency rating is now one notch below investment grade, which starts at 'BBB-'. The increase has put it on the same level as Romania, Egypt and El Salvador, and one level below Russia.
-Original Summary	India's rupee has hit a five-year high after Standard & Poor's (S&P) raised the country's foreign currency rating.India's foreign currency rating is now one notch below investment grade, which starts at 'BBB-'.S&P, which rates borrowers' creditworthiness, lifted India's rating by one notch to 'BB+'.The currency has gained almost 1% in the past three sessions.
-TF_IDF Summary	India's rupee has hit a five-year high after Standard & Poor's (S&P) raised the country's foreign currency rating. The rupee climbed to 43.305 per US dollar on Thursday, up from a close of 43.41. The currency has gained almost 1% in the past three sessions. S&P, which rates borrowers' creditworthiness, lifted India's rating by one notch to 'BB+'. India's foreign currency rating is now one notch below investment grade, which starts at 'BBB-'.
-GloVe Summary	The rupee climbed to 43.305 per US dollar on Thursday, up from a close of 43.41.
+
+**Original Summary**
+
+India's rupee has hit a five-year high after Standard & Poor's (S&P) raised the country's foreign currency rating.India's foreign currency rating is now one notch below investment grade, which starts at 'BBB-'.S&P, which rates borrowers' creditworthiness, lifted India's rating by one notch to 'BB+'.The currency has gained almost 1% in the past three sessions.
+
+**TF_IDF Summary**
+
+India's rupee has hit a five-year high after Standard & Poor's (S&P) raised the country's foreign currency rating. The rupee climbed to 43.305 per US dollar on Thursday, up from a close of 43.41. The currency has gained almost 1% in the past three sessions. S&P, which rates borrowers' creditworthiness, lifted India's rating by one notch to 'BB+'. India's foreign currency rating is now one notch below investment grade, which starts at 'BBB-'.
+
+**GloVe Summary**
+
+The rupee climbed to 43.305 per US dollar on Thursday, up from a close of 43.41.
 The currency has gained almost 1% in the past three sessions.
 S&P, which rates borrowers' creditworthiness, lifted India's rating by one notch to 'BB+'.
 "Money has moved out from India in the first two or three weeks of January into other markets like Korea and Thailand and this upgrade should lead to a reversal."
 India's foreign currency rating is now one notch below investment grade, which starts at 'BBB-'.
-Text Rank Summary	India's rupee has hit a five-year high after Standard & Poor's (S&P) raised the country's foreign currency rating. India's foreign currency rating is now one notch below investment grade, which starts at 'BBB-'. S&P, which rates borrowers' creditworthiness, lifted India's rating by one notch to 'BB+'. The currency has gained almost 1% in the past three sessions. The rupee climbed to 43.305 per US dollar on Thursday, up from a close of 43.41.
+
+**Text Rank Summary**
+
+India's rupee has hit a five-year high after Standard & Poor's (S&P) raised the country's foreign currency rating. India's foreign currency rating is now one notch below investment grade, which starts at 'BBB-'. S&P, which rates borrowers' creditworthiness, lifted India's rating by one notch to 'BB+'. The currency has gained almost 1% in the past three sessions. The rupee climbed to 43.305 per US dollar on Thursday, up from a close of 43.41.
 
 
 
-Table 5: Politics Article
-Article	Tsunami debt deal to be announced
+**Table 5: Politics Article**
+**Article**
+Tsunami debt deal to be announced
 
 Chancellor Gordon Brown has said he hopes to announce a deal to suspend debt interest repayments by tsunami-hit nations later on Friday.
 
 The agreement by the G8 group of wealthy nations would save affected countries £3bn pounds a year, he said. The deal is thought to have been hammered out on Thursday night after Japan, one of the biggest creditor nations, finally signed up to it. Mr Brown first proposed the idea earlier this week.
 
 G8 ministers are also believed to have agreed to instruct the World Bank and the International Monetary Fund to complete a country by country analysis of the reconstruction problems faced by all states hit by the disaster. Mr Brown has been locked in talks with finance ministers of the G8, which Britain now chairs. Germany also proposed a freeze and Canada has begun its own moratorium. The expected deal comes as Foreign Secretary Jack Straw said the number of Britons dead or missing in the disaster have reached 440.
-Original Summary	Mr Brown has been locked in talks with finance ministers of the G8, which Britain now chairs.Chancellor Gordon Brown has said he hopes to announce a deal to suspend debt interest repayments by tsunami-hit nations later on Friday.The agreement by the G8 group of wealthy nations would save affected countries £3bn pounds a year, he said.Mr Brown first proposed the idea earlier this week.
-TF_IDF Summary	Chancellor Gordon Brown has said he hopes to announce a deal to suspend debt interest repayments by tsunami-hit nations later on Friday. The agreement by the G8 group of wealthy nations would save affected countries Â£3bn pounds a year, he said. The deal is thought to have been hammered out on Thursday night after Japan, one of the biggest creditor nations, finally signed up to it. Mr Brown first proposed the idea earlier this week. The expected deal comes as Foreign Secretary Jack Straw said the number of Britons dead or missing in the disaster have reached 440.
-GloVe Summary	Chancellor Gordon Brown has said he hopes to announce a deal to suspend debt interest repayments by tsunami-hit nations later on Friday.
+
+**Original Summary**
+
+Mr Brown has been locked in talks with finance ministers of the G8, which Britain now chairs.Chancellor Gordon Brown has said he hopes to announce a deal to suspend debt interest repayments by tsunami-hit nations later on Friday.The agreement by the G8 group of wealthy nations would save affected countries £3bn pounds a year, he said.Mr Brown first proposed the idea earlier this week.
+
+**TF_IDF Summary**
+
+Chancellor Gordon Brown has said he hopes to announce a deal to suspend debt interest repayments by tsunami-hit nations later on Friday. The agreement by the G8 group of wealthy nations would save affected countries Â£3bn pounds a year, he said. The deal is thought to have been hammered out on Thursday night after Japan, one of the biggest creditor nations, finally signed up to it. Mr Brown first proposed the idea earlier this week. The expected deal comes as Foreign Secretary Jack Straw said the number of Britons dead or missing in the disaster have reached 440.
+
+**GloVe Summary**
+
+Chancellor Gordon Brown has said he hopes to announce a deal to suspend debt interest repayments by tsunami-hit nations later on Friday.
 The agreement by the G8 group of wealthy nations would save affected countries Â£3bn pounds a year, he said. The deal is thought to have been hammered out on Thursday night after Japan, one of the biggest creditor nations, finally signed up to it. Mr Brown first proposed the idea earlier this week. The expected deal comes as Foreign Secretary Jack Straw said the number of Britons dead or missing in the disaster have reached 440.
-Text Rank Summary	Chancellor Gordon Brown has said he hopes to announce a deal to suspend debt interest repayments by tsunami-hit nations later on Friday. G8 ministers are also believed to have agreed to instruct the World Bank and the International Monetary Fund to complete a country by country analysis of the reconstruction problems faced by all states hit by the disaster. The agreement by the G8 group of wealthy nations would save affected countries Â£3bn pounds a year, he said. The deal is thought to have been hammered out on Thursday night after Japan, one of the biggest creditor nations, finally signed up to it. The expected deal comes as Foreign Secretary Jack Straw said the number of Britons dead or missing in the disaster have reached 440.
+
+**Text Rank Summary**	
+
+Chancellor Gordon Brown has said he hopes to announce a deal to suspend debt interest repayments by tsunami-hit nations later on Friday. G8 ministers are also believed to have agreed to instruct the World Bank and the International Monetary Fund to complete a country by country analysis of the reconstruction problems faced by all states hit by the disaster. The agreement by the G8 group of wealthy nations would save affected countries Â£3bn pounds a year, he said. The deal is thought to have been hammered out on Thursday night after Japan, one of the biggest creditor nations, finally signed up to it. The expected deal comes as Foreign Secretary Jack Straw said the number of Britons dead or missing in the disaster have reached 440.
 
 
-7. Conclusion
+**7. Conclusion**
 
 This project report explores extractive based approaches to generate summaries where TextRank  works best for sports and technology related domain articles. TD_IDF provide better summaries across all article. Glove works netural better across all domains. 
 To improve these methods POS tags were used to extract more relevant features from the text. This improved the performance of TextRank method with  F1 score of 0.47 which is better than TF-IDF and GloVe F1-Scores. 
@@ -615,38 +386,38 @@ Finally, for the future scope to improve the extractive based summary generation
 Second, to generate better summaries for huge articles and avoid fixed length of summaries. The number of sentences to be included in the summary was fixed which was top 5 sentence with highest score was chosen. This approach works better with shorter articles and may yield poor result with long articles.
 
 
-8. References
+**8. References**
 
-	[1] Christian, H., Agus, M. P., & Suhartono, D. (2016). Single document automatic text summarization using term frequency-inverse document frequency (TF-IDF). ComTech: Computer, Mathematics and Engineering Applications, 7(4), 285-294.
+[1] Christian, H., Agus, M. P., & Suhartono, D. (2016). Single document automatic text summarization using term frequency-inverse document frequency (TF-IDF). ComTech: Computer, Mathematics and Engineering Applications, 7(4), 285-294.
 
-	[2] Yohei, S. E. K. I. (2003). Sentence Extraction by tf/idf and Position Weighting from Newspaper. In Proceedings of the Third NTCIR Workshop.
+[2] Yohei, S. E. K. I. (2003). Sentence Extraction by tf/idf and Position Weighting from Newspaper. In Proceedings of the Third NTCIR Workshop.
 
-	[3] Yong, S. P., Abidin, A. I., & Chen, Y. Y. (2006). A neural-based text summarization system. WIT Transactions on Information and Communication Technologies, 37.
+[3] Yong, S. P., Abidin, A. I., & Chen, Y. Y. (2006). A neural-based text summarization system. WIT Transactions on Information and Communication Technologies, 37.
 
-	[4] Kaikhah, K. (2004). Text summarization using neural networks.
+[4] Kaikhah, K. (2004). Text summarization using neural networks.
 
-	[5] Sinha, A., Yadav, A., & Gahlot, A. (2018). Extractive text summarization using neural networks. arXiv preprint arXiv:1802.10137.
+[5] Sinha, A., Yadav, A., & Gahlot, A. (2018). Extractive text summarization using neural networks. arXiv preprint arXiv:1802.10137.
 
-	[6] Jo, T., Lee, M., & Gatton, T. M. (2006, November). Keyword extraction from documents using a neural network model. In 2006 International Conference on Hybrid Information Technology (Vol. 2, pp. 194-197). IEEE.
+[6] Jo, T., Lee, M., & Gatton, T. M. (2006, November). Keyword extraction from documents using a neural network model. In 2006 International Conference on Hybrid Information Technology (Vol. 2, pp. 194-197). IEEE.
 
-	[7] Gupta, V., & Lehal, G. S. (2010). A survey of text summarization extractive techniques. Journal of emerging technologies in web intelligence, 2(3), 258-268.
+[7] Gupta, V., & Lehal, G. S. (2010). A survey of text summarization extractive techniques. Journal of emerging technologies in web intelligence, 2(3), 258-268.
 
-	[8] Mridha, M. F., Lima, A. A., Nur, K., Das, S. C., Hasan, M., & Kabir, M. M. (2021). A survey of automatic text summarization: Progress, process and challenges. IEEE Access, 9, 156043-156070.
+[8] Mridha, M. F., Lima, A. A., Nur, K., Das, S. C., Hasan, M., & Kabir, M. M. (2021). A survey of automatic text summarization: Progress, process and challenges. IEEE Access, 9, 156043-156070.
 
-	[9] Yadav, D., Desai, J., & Yadav, A. K. (2022). Automatic text summarization methods: A comprehensive review. arXiv preprint arXiv:2204.01849.
+[9] Yadav, D., Desai, J., & Yadav, A. K. (2022). Automatic text summarization methods: A comprehensive review. arXiv preprint arXiv:2204.01849.
 
-	[[10] Haque, M. M., Pervin, S., & Begum, Z. (2013). Literature review of automatic single document text summarization using NLP. International Journal of Innovation and Applied Studies, 3(3), 857-865.
+[10] Haque, M. M., Pervin, S., & Begum, Z. (2013). Literature review of automatic single document text summarization using NLP. International Journal of Innovation and Applied Studies, 3(3), 857-865.
 
-	[11] Haider, M. M., Hossin, M. A., Mahi, H. R., & Arif, H. (2020, June). Automatic text summarization using gensim word2vec and k-means clustering algorithm. In 2020 IEEE Region 10 Symposium (TENSYMP) (pp. 283-286). IEEE.
+[11] Haider, M. M., Hossin, M. A., Mahi, H. R., & Arif, H. (2020, June). Automatic text summarization using gensim word2vec and k-means clustering algorithm. In 2020 IEEE Region 10 Symposium (TENSYMP) (pp. 283-286). IEEE.
 
-	[12] Khan, R., Qian, Y., & Naeem, S. (2019). Extractive based text summarization using k-means and tf-idf. International Journal of Information Engineering and Electronic Business, 10(3), 33.
+[12] Khan, R., Qian, Y., & Naeem, S. (2019). Extractive based text summarization using k-means and tf-idf. International Journal of Information Engineering and Electronic Business, 10(3), 33.
 
-	[13] García-Hernández, R. A., & Ledeneva, Y. (2009, February). Word sequence models for single text summarization. In 2009 Second International Conferences on Advances in Computer-Human Interactions (pp. 44-48). IEEE.
+[13] García-Hernández, R. A., & Ledeneva, Y. (2009, February). Word sequence models for single text summarization. In 2009 Second International Conferences on Advances in Computer-Human Interactions (pp. 44-48). IEEE.
 
-	[14] Gunasundari, S., Shylaja, M. J., Rajalaksmi, S., & Aarthi, M. K. IMPROVED DRIVEN TEXT SUMMARIZATION USING PAGERANKING ALGORITHM AND COSINE SIMILARITY.
+[14] Gunasundari, S., Shylaja, M. J., Rajalaksmi, S., & Aarthi, M. K. IMPROVED DRIVEN TEXT SUMMARIZATION USING PAGERANKING ALGORITHM AND COSINE SIMILARITY.
 
-	[15] Badgujar, A., Shaikh, A., Kamble, T., & Makhija, G. TEXT SUMMARIZATION USING NATURAL LANGUAGE PROCESSING.
+[15] Badgujar, A., Shaikh, A., Kamble, T., & Makhija, G. TEXT SUMMARIZATION USING NATURAL LANGUAGE PROCESSING.
 
-	[16] JUGRAN, S., KUMAR, A., TYAGI, B. S., & ANAND, V. (2021, March). Extractive automatic text summarization using SpaCy in Python & NLP. In 2021 International conference on advance computing and innovative technologies in engineering (ICACITE) (pp. 582-585). IEEE.
+[16] JUGRAN, S., KUMAR, A., TYAGI, B. S., & ANAND, V. (2021, March). Extractive automatic text summarization using SpaCy in Python & NLP. In 2021 International conference on advance computing and innovative technologies in engineering (ICACITE) (pp. 582-585). IEEE.
  
-	 [17] https://nlp.stanford.edu/projects/glove/
+[17] https://nlp.stanford.edu/projects/glove/
