@@ -16,6 +16,8 @@ Summarify is a text summarization application. It is a NLP based project which a
 ![image](https://github.com/Trushali29/Summarify/assets/84562990/af4ea2a7-a5d5-4587-8581-522553f75820)
 
 **See the running application video below** 
+
+
 [Final summarify.webm](https://github.com/Trushali29/Summarify/assets/84562990/4815d8b8-007f-45c9-814f-4f2b14c5964e)
 
  
