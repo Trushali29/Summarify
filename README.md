@@ -2,11 +2,11 @@
 Summarify is a text summarization application. It is a NLP based project which aim to provide summaries of the documents such as news. 
 
 # Steps to run the project
-1. In install pre-trained GLoVe model from site : https://nlp.stanford.edu/projects/glove/ - Glove.6B.zip
+1. Install pre-trained GLoVe model from site : https://nlp.stanford.edu/projects/glove/ - Glove.6B.zip
 2. Install pandas, nltk, spacy, CustomTkinter, numpy modules in using commmand - pip install modulename.
-3. Get the BBC News summaries whle dataset from https://huggingface.co/datasets/gopalkalpande/bbc-news-summary
+3. Get the BBC News summaries whole dataset from https://huggingface.co/datasets/gopalkalpande/bbc-news-summary
 4. Run the bbc-news-dataset python file which will generate folders. Main folders are Articles and Summaries each consists tech, sport, business, politics and entertainment as folder.
-5. Each 5 folders consist around 300 news articles.
+5. Each 5 folders consists around 300 news articles.
 6. Create generate summaries folder in bbc news dataset folder.
 7. Run the main file.
 
